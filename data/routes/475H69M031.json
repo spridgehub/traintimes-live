@@ -1,1 +1,1 @@
-{"train_id":"475H69M031","points":[[52.22448,0.15848]],"calls":[],"origin":"Cambridge North","destination":"Cambridge Sidings South","operator":"Greater Anglia","operator_code":"LE","delay_minutes":null,"where":null,"cancelled":false,"terminated":false}
+{"train_id":"475H69M031","points":[[52.22448,0.15848]],"calls":[],"origin":"Cambridge North","destination":"Cambridge Sidings South","operator":"Greater Anglia","operator_code":"LE","delay_minutes":11,"where":"Left Coldham Lane Jn","cancelled":false,"terminated":false}

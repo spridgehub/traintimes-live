@@ -1,1 +1,1 @@
-{"train_id":"795B34M031","points":[[51.62515,-3.94155]],"calls":[],"origin":"Swansea","destination":"Swansea Maliphant Iep Dpt","operator":"Great Western Railway","operator_code":"GW","delay_minutes":null,"where":null,"cancelled":false,"terminated":false}
+{"train_id":"795B34M031","points":[[51.62515,-3.94155]],"calls":[],"origin":"Swansea","destination":"Swansea Maliphant Iep Dpt","operator":"Great Western Railway","operator_code":"GW","delay_minutes":13,"where":"Left Swansea","cancelled":false,"terminated":false}
