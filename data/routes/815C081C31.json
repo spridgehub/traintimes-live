@@ -1,1 +1,1 @@
-{"train_id":"815C081C31","points":[[51.44914,-2.58132],[51.44914,-2.58132]],"calls":[],"origin":"Bristol Temple Meads","destination":"Bristol Temple Meads","operator":"Great Western Railway","operator_code":"GW","delay_minutes":null,"where":null,"cancelled":false,"terminated":false}
+{"train_id":"815C081C31","points":[[51.44914,-2.58132],[51.44914,-2.58132]],"calls":[],"origin":"Bristol Temple Meads","destination":"Bristol Temple Meads","operator":"Great Western Railway","operator_code":"GW","delay_minutes":0,"where":"At Bristol West Jn","cancelled":false,"terminated":false}
