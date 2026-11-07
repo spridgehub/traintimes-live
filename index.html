@@ -147,8 +147,10 @@
 .kicker{margin:0;font:700 14px/1.1 var(--font-head);letter-spacing:.12em;text-transform:uppercase;color:var(--signal-ink)}
 .why{font:700 14px/1.2 var(--font-head);letter-spacing:.12em;text-transform:uppercase;color:var(--signal-ink)}
 .why i{font-size:15px;margin-top:-2px}
-.route{margin:12px 0 0;font:700 clamp(42px,12vw,72px)/.9 var(--font-head);letter-spacing:.01em;text-transform:uppercase;overflow-wrap:anywhere}
-.route em{display:block;margin-top:.1em;font:italic 400 .54em/1.15 var(--font-serif);letter-spacing:0;text-transform:none;color:var(--signal-ink)}
+/* Both stations the same size and weight, plain case: read at a glance (Ian, 7 Nov: the big uppercase
+   station over a small italic one was "too dramatic and not easy to read fast"). */
+.route{margin:12px 0 0;font:650 clamp(26px,7vw,36px)/1.15 var(--font-ui);letter-spacing:-.02em;overflow-wrap:anywhere}
+.route em{display:block;font:inherit;color:inherit}
 .route .to{color:var(--ink-3)}
 .tile.first::before{content:"";position:absolute;right:-120px;top:-120px;width:340px;height:340px;pointer-events:none;
   background:radial-gradient(closest-side,var(--signal-glow),transparent)}

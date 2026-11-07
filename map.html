@@ -57,7 +57,9 @@ body{overflow:hidden}
 #panel .trip-sub .t{font:680 22px/1 var(--font-num);color:var(--ink-1)}
 #panel .trip-sub .st{font-weight:650}
 #panel .trip-sub .recentre{order:9;height:28px;font-size:12px}
-#panel .trip-sub .now{font:600 12px/1 var(--font-num);color:var(--ink-4);margin-left:auto}
+#panel .trip-sub .moved{font:680 22px/1 var(--font-num)}
+#panel .trip-sub .moved small{font:600 12.5px/1 var(--font-ui);margin-right:4px}
+#panel .trip-sub .t.gone{text-decoration:line-through;color:var(--ink-3)}
 #trip-near{border-top:1px solid var(--line);padding:8px 16px 10px}
 #trip-near h2{margin:0 0 6px;font:650 12px/1.3 var(--font-ui);color:var(--ink-3)}
 #trip-near ul{list-style:none;margin:0;padding:0;display:grid;gap:6px}
@@ -229,8 +231,8 @@ body{overflow:hidden}
   #panel #trip-back i,#panel .trip-sub .recentre i{font-size:18px;margin:0}
   #panel #trip-title{grid-column:2;font-size:15.5px;line-height:1.25;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
   #panel .trip-sub{grid-column:1/-1;margin-top:6px;gap:2px 12px}
-  #panel .trip-sub .t{font-size:20px}
-  #panel .trip-sub .now,#panel .trip-sub > span:last-child{display:none}
+  #panel .trip-sub .t,#panel .trip-sub .moved{font-size:20px}
+  #panel .trip-sub > span:last-child{display:none}
   #panel .trip-sub .recentre{position:absolute;top:0;right:12px;width:36px;height:36px;padding:0;
     justify-content:center;font-size:0}
   #trip-near{padding:6px 14px 8px}
@@ -740,10 +742,12 @@ function showTrip(route) {
   const late = route.delay_minutes ?? t.delay_minutes;
   const status = route.cancelled ? "Cancelled" : late > 0 ? delayLabel(late) : late < 0 ? delayLabel(late) : late === 0 ? "On time" : "";
   const statusColour = route.cancelled || late >= VERY_LATE_MINUTES ? colour("verylate") : late > 0 ? colour("late") : colour("ontime");
+  const leaves = on.actual || on.expected, moved = !route.cancelled && leaves && time(leaves) !== time(on.planned);
   $id("trip-sub").innerHTML = `<button type="button" class="chip recentre" id="recentre" title="Back to where the train is">` +
       `<i class="ph ph-crosshair" aria-hidden="true"></i>Recentre</button>` +
-    `<span class="t">${time(on.planned)}</span>` +
-    `<span class="now" id="trip-now">Now ${time(new Date().toISOString())}</span>` +
+    // The booked time is how you know which train this is; if it's going later, the new time beside it.
+    `<span class="t${route.cancelled ? " gone" : ""}">${time(on.planned)}</span>` +
+    (moved ? `<span class="moved" style="color:${statusColour}"><small>${on.actual ? "Left" : "Now leaving"}</small>${time(leaves)}</span>` : "") +
     `<span>arrives ${time(off.expected || off.actual || off.planned)}</span>` +
     (status ? `<span class="st" style="color:${statusColour}">${esc(status)}</span>` : "") +
     (on.platform ? `<span>Plat ${esc(on.platform)}</span>` : "") +
@@ -792,8 +796,6 @@ document.getElementById("trip-back").onclick = () => {
 };
 // Keep the trip's times live.
 setInterval(() => { if (tripMode && selected === tripTrain) select(selected, { popup: false }); }, 30000);
-// The time now, on the trip panel, so the stop times read against it.
-setInterval(() => { const el = document.getElementById("trip-now"); if (el) el.textContent = `Now ${time(new Date().toISOString())}`; }, 10000);
 
 // Any train you pick: its trip panel (every stop and time) and its route, with
 // the trains that could hold it up. You chose it, so don't jump back to yours.
