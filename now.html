@@ -1,0 +1,1000 @@
+<!doctype html>
+<html lang="en" data-static="1" data-api="https://ians-mac-mini.tail9eb485.ts.net:8443">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#0b0c0e">
+<title>Your next train | TrainTimes</title>
+<meta name="description" content="Your next trains to work or home at a glance, coloured by how often each one runs on time.">
+<script>try{var t=localStorage.getItem("tt-theme");if(t)document.documentElement.setAttribute("data-theme",t)}catch(e){}</script>
+<link rel="preload" href="assets/fonts/Geist-Variable.woff2" as="font" type="font/woff2" crossorigin>
+<link rel="preload" href="assets/fonts/GeistMono-Variable.woff2" as="font" type="font/woff2" crossorigin>
+<link rel="stylesheet" href="assets/brand.css">
+<link rel="preconnect" href="https://unpkg.com" crossorigin>
+<!-- Icons don't hold up the first draw on a phone (6 Nov): a third-party stylesheet blocked it. -->
+<link rel="stylesheet" href="https://unpkg.com/@phosphor-icons/web@2.1.1/src/regular/style.css" media="print" onload="this.media='all'">
+<noscript><link rel="stylesheet" href="https://unpkg.com/@phosphor-icons/web@2.1.1/src/regular/style.css"></noscript>
+<script src="assets/theme.js" defer></script>
+<script src="assets/picker.js"></script>
+<script src="assets/why.js"></script>
+<script src="assets/settings.js"></script>
+<script src="assets/accounts.js"></script>
+<script src="assets/platform.js"></script>
+<script src="assets/format.js"></script>
+<script src="assets/routes.js"></script>
+<style>
+/* Next train. Design read: a glanceable commuter screen on a phone, one question
+   ("when's my train?") answered in big type, on the shared brand layer.
+   Dials: VARIANCE 4, MOTION 3, DENSITY 4. */
+#main{padding-top:28px;padding-bottom:40px}
+.why{display:flex;align-items:center;gap:8px;font:500 13px/1.3 var(--font-ui);color:var(--ink-3);min-height:18px}
+.why i{font-size:15px;color:var(--signal-ink)}
+.route{margin:10px 0 0;font-size:clamp(26px,7vw,38px);line-height:1.08;letter-spacing:-.035em;font-weight:700}
+.route .arrow{color:var(--ink-4);font-weight:500;padding:0 .12em}
+.lead{display:flex;align-items:center;gap:12px;min-height:24px}
+.lead .why{flex:1;min-width:0}
+.dir{display:flex;gap:6px;margin-top:14px;align-items:center}
+.updated{display:flex;align-items:center;gap:2px;margin-left:auto;font:450 12.5px/1 var(--font-num);color:var(--ink-4)}
+.updated .refresh{width:36px;height:36px;font-size:18px;color:var(--ink-3)}
+.updated .refresh.busy i{animation:tt-spin .8s linear infinite}
+@media (prefers-reduced-motion:reduce){.updated .refresh.busy i{animation:none;opacity:.5}}
+.updated[hidden]{display:none}
+.lead .edit::after{content:"";position:absolute;inset:-9px -4px}
+.lead .edit{position:relative;flex:none;font-size:13px;color:var(--signal-ink);background:none;border:0;padding:6px 0;cursor:pointer}
+
+.tiles{list-style:none;margin:22px 0 0;padding:0;display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}
+@media (min-width:640px){.tiles{grid-template-columns:repeat(3,minmax(0,1fr))}}
+.tile{display:flex;flex-direction:column;gap:6px;padding:14px 14px 12px;min-height:128px;text-decoration:none;color:inherit;
+  background:var(--panel);border:1px solid var(--line);border-radius:var(--r-panel);position:relative;
+  transition:transform .12s var(--ease-out),border-color .15s var(--ease-out)}
+/* Tiles are buttons: tapping one mustn't select its text (or, held, pop up the copy menu) */
+.tiles,.tiles *{-webkit-user-select:none;user-select:none;-webkit-touch-callout:none}
+.tile{-webkit-tap-highlight-color:transparent}
+.tile:hover{border-color:var(--line-strong)}
+.tile:active{transform:scale(.98)}
+.tiles li.wide{grid-column:1/-1}
+.tile{height:100%;box-sizing:border-box}
+.tile.first{min-height:0;padding:18px 18px 22px}
+/* Live status, as on Live Status: the time in its colour and a bar along the bottom. */
+.tile{position:relative;overflow:hidden;padding-bottom:18px}
+.tile::after{content:"";position:absolute;left:0;right:0;bottom:0;height:6px;background:var(--b,var(--s,var(--st-none)))}
+.tile .t{font:680 clamp(34px,10vw,44px)/1 var(--font-num);letter-spacing:-.03em;color:var(--ink-1);
+  font-variant-numeric:tabular-nums}
+.tile.first .t{font-size:clamp(52px,16vw,72px)}
+.tile .t s{font-size:.5em;color:var(--ink-4);margin-left:6px;text-decoration-thickness:2px}
+.tile .live{font:500 13.5px/1.25 var(--font-ui);color:var(--ink-2)}
+.tile .top{display:flex;align-items:baseline;gap:10px;flex-wrap:wrap}
+.tile .stn{display:inline-flex;align-items:center;gap:6px;margin-top:6px;font:650 12.5px/1 var(--font-ui);color:var(--ink-1)}
+.tile .stn::before{content:"";width:8px;height:8px;border-radius:50%;background:var(--k)}
+.tile .delta{font:650 13px/1 var(--font-num);color:var(--s,var(--ink-3));white-space:nowrap}
+.tile .meta{font:450 12.5px/1.3 var(--font-num);color:var(--ink-3);margin-top:auto}
+.tile .via{font:500 12.5px/1.3 var(--font-ui);color:var(--ink-3)}
+.tile .tile-plat{align-self:flex-start;margin-top:2px}
+.tile .main,.tile .side{display:flex;flex-direction:column;gap:6px;min-width:0}
+.tile .side{margin-top:auto}
+.tile .meta b{font-weight:600;color:var(--ink-1)}
+.tile .meta{white-space:nowrap}
+.tile .foot{display:flex;align-items:center;justify-content:space-between;gap:8px;min-height:24px}
+/* The first train: its time on the left, where and when it gets you on the right. */
+.tile.first{flex-direction:row;align-items:flex-end;justify-content:space-between;gap:16px}
+.tile.first .side{align-items:flex-end;text-align:right;margin-top:0}
+.tile.first .meta{font-size:13.5px}
+.tile.first .meta b{display:block;font:680 clamp(24px,7vw,30px)/1.05 var(--font-num);letter-spacing:-.02em;margin-top:2px}
+.tile.first .tile-plat{align-self:flex-end}
+.tile.first.station,.tile.first.route{flex-direction:column;align-items:stretch;justify-content:flex-start;gap:6px}
+.tile .odds{font:600 11.5px/1 var(--font-num);color:var(--c,var(--ink-4));
+  padding:5px 7px;border-radius:var(--r-pill);background:color-mix(in srgb,var(--c,var(--ink-4)) 12%,transparent)}
+.tile.cancelled .t{text-decoration:line-through;text-decoration-thickness:3px}
+.empty{grid-column:1/-1;padding:28px 18px;text-align:center;color:var(--ink-3);background:var(--panel);
+  border:1px dashed var(--line-strong);border-radius:var(--r-panel)}
+.key{--st-late:var(--st-late-fill);display:flex;flex-wrap:wrap;gap:6px 14px;margin:14px 0 0;font-size:12.5px;color:var(--ink-3)}
+.key .pct::before{display:none}
+.key span::before{content:"";display:inline-block;width:8px;height:8px;border-radius:50%;background:var(--c);margin-right:6px}
+
+/* The route's strip: one segment per hour, coloured by how late trains have been */
+.strip{margin:12px 0 0}
+.strip .segs{--st-late:var(--st-late-fill);display:flex;gap:2px;height:8px}
+.strip .segs button{flex:1;min-width:0;border:0;padding:0;border-radius:2px;background:var(--c);cursor:pointer;
+  position:relative;transition:transform .12s var(--ease-out)}
+.strip .segs button::after{content:"";position:absolute;inset:-18px -1px}   /* 44px to touch */
+.strip .segs button.now{transform:scaleY(1.6)}
+.strip .segs button[aria-pressed="true"]{outline:2px solid var(--ink-1);outline-offset:1px}
+.strip .ends{display:flex;justify-content:space-between;margin-top:5px;font:500 10.5px/1 var(--font-num);color:var(--ink-4)}
+.strip .say{min-height:15px;margin-top:5px;font:500 12px/1.25 var(--font-ui);color:var(--ink-3)}
+
+.setup{margin-top:22px;padding:16px;background:var(--panel);border:1px solid var(--line);border-radius:var(--r-panel)}
+.setup h2{font-size:17px;font-weight:650}
+.setup p{margin:6px 0 0;font-size:13.5px;color:var(--ink-3)}
+.setup .two{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:14px;position:relative}
+.setup .two .picker-list{grid-column:1/-1}
+.setup input{height:42px;font-size:15px}
+.setup .row{display:flex;gap:8px;margin-top:14px;flex-wrap:wrap}
+.btn{display:inline-flex;align-items:center;gap:8px;height:40px;padding:0 16px;border-radius:var(--r-control);
+  border:1px solid var(--line-strong);background:var(--panel-up);color:var(--ink-1);font:600 14px var(--font-ui);cursor:pointer}
+.btn.primary{background:var(--signal);border-color:var(--signal);color:var(--on-signal)}
+.btn:active{transform:scale(.97)}
+/* At the station: one big card for the next train you can catch */
+.station .eyebrow{font:600 12px/1.2 var(--font-ui);letter-spacing:.06em;text-transform:uppercase;color:var(--ink-3)}
+.station .t s{font-size:.42em}
+.station .count{font:600 15px/1.2 var(--font-num);color:var(--ink-2)}
+.station .platbig{display:grid;grid-template-columns:auto 1fr;align-items:end;column-gap:12px;margin-top:10px}
+.station .platbig .k{grid-column:1/-1;font:700 12.5px/1 var(--font-head);letter-spacing:.12em;text-transform:uppercase;color:var(--ink-3);margin-bottom:4px}
+.station .platbig b{font:600 clamp(30px,9vw,40px)/1 var(--font-num);letter-spacing:-.02em;color:var(--ink-1)}
+.station .platbig .how{display:flex;align-items:center;gap:6px;padding-bottom:4px;font:450 13px/1.3 var(--font-ui);color:var(--ink-3)}
+.station .platbig .how::before{content:"";flex:none;width:7px;height:7px;border-radius:50%;background:var(--d,var(--ink-4))}
+.station .platbig.sure{--d:var(--st-ok)}
+.station .platbig.watch{--d:var(--st-late-fill)}
+.station .platbig.guess b{color:var(--ink-2)}
+.station .platbig.gone b{color:var(--ink-4)}
+.station .reason{font:500 13.5px/1.35 var(--font-ui);color:var(--ink-2)}
+.station .notes{margin:0;padding:0;list-style:none;display:grid;gap:4px;font:450 12.5px/1.35 var(--font-ui);color:var(--ink-3)}
+.gone{grid-column:1/-1;font:500 13px/1.3 var(--font-ui);color:var(--st-bad)}
+@media (prefers-reduced-motion:reduce){.strip .segs button{transition:none}}
+@media (prefers-reduced-motion:reduce){.tile,.btn{transition:none}.tile:active,.btn:active{transform:none}}
+/* ---- Borrowed from Posh On Paper: a floodlit hero over faint timetable rules, the route
+   in a condensed board face with the destination in an italic serif, short signal rules
+   over section heads, a numbers ribbon, and the small print folded away. ---- */
+:root{--font-head:"DIN Condensed","Barlow Condensed","Roboto Condensed",sans-serif-condensed,"Arial Narrow",sans-serif;
+  --font-serif:Georgia,"Times New Roman",serif;--signal-glow:color-mix(in srgb,var(--signal) 22%,transparent)}
+.hero{position:relative;isolation:isolate}
+.glow{position:absolute;top:-28px;height:620px;left:calc(50% - 50vw);right:calc(50% - 50vw);pointer-events:none;overflow:hidden;z-index:-1}
+.glow::before{content:"";position:absolute;width:960px;height:600px;left:50%;top:-330px;transform:translateX(-30%);
+  background:radial-gradient(closest-side,var(--signal-glow),transparent 70%)}
+.glow::after{content:"";position:absolute;inset:0;background-image:linear-gradient(var(--line) 1px,transparent 1px);
+  background-size:100% 40px;mask-image:linear-gradient(180deg,rgb(0 0 0/.65),transparent 80%);
+  -webkit-mask-image:linear-gradient(180deg,rgb(0 0 0/.65),transparent 80%)}
+.rule{height:2px;width:48px;background:var(--signal);border-radius:2px;margin:0 0 16px}
+.kicker{margin:0;font:700 14px/1.1 var(--font-head);letter-spacing:.12em;text-transform:uppercase;color:var(--signal-ink)}
+.why{font:700 14px/1.2 var(--font-head);letter-spacing:.12em;text-transform:uppercase;color:var(--signal-ink)}
+.why i{font-size:15px;margin-top:-2px}
+.route{margin:12px 0 0;font:700 clamp(42px,12vw,72px)/.9 var(--font-head);letter-spacing:.01em;text-transform:uppercase;overflow-wrap:anywhere}
+.route em{display:block;margin-top:.1em;font:italic 400 .54em/1.15 var(--font-serif);letter-spacing:0;text-transform:none;color:var(--signal-ink)}
+.route .to{color:var(--ink-3)}
+.tile.first::before{content:"";position:absolute;right:-120px;top:-120px;width:340px;height:340px;pointer-events:none;
+  background:radial-gradient(closest-side,var(--signal-glow),transparent)}
+.tile.first>*{position:relative}
+.tile:focus-visible{outline:2px solid var(--signal);outline-offset:2px}
+
+.by-nums{margin-top:44px}
+.h-section{font:700 clamp(34px,9vw,52px)/.92 var(--font-head);text-transform:uppercase;letter-spacing:.01em;margin:8px 0 0}
+.nums{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));margin:18px 0 0;background:var(--panel);
+  border:1px solid var(--line);border-radius:var(--r-panel);overflow:hidden}
+.nums div{padding:14px 16px;border-left:1px solid var(--line);min-width:0}
+.nums div:first-child{border-left:0}
+.nums span{display:block;font:700 12.5px/1 var(--font-head);letter-spacing:.12em;text-transform:uppercase;color:var(--ink-3)}
+.nums b{display:block;margin-top:8px;font:680 24px/1 var(--font-num);letter-spacing:-.03em;color:var(--v,var(--ink-1))}
+.nums small{display:block;margin-top:5px;font:450 12px/1.3 var(--font-ui);color:var(--ink-4)}
+@media (max-width:560px){.nums{grid-template-columns:1fr 1fr}.nums div:nth-child(3){border-left:0}
+  .nums div:nth-child(n+3){border-top:1px solid var(--line)}}
+
+/* Today on the line: one square per train you could have taken, like a form guide */
+.today{margin:18px 0 0;padding:16px;background:var(--panel);border:1px solid var(--line);border-radius:var(--r-panel);
+  display:grid;gap:14px}
+.today .leg span{display:block;font:700 12.5px/1 var(--font-head);letter-spacing:.12em;text-transform:uppercase;color:var(--ink-3)}
+.today .form{display:flex;flex-wrap:wrap;gap:4px;margin:9px 0 0;padding:0;list-style:none}
+.today .form li{width:22px;height:22px;border-radius:5px;background:var(--c);display:grid;place-items:center;
+  font:700 11px/1 var(--font-num);color:var(--carbon)}
+.today .form li.x{background:transparent;border:1.5px solid var(--st-bad);color:var(--st-bad)}
+.today .form li.run{background:transparent;border:1.5px dashed var(--line-strong)}
+.today p{margin:8px 0 0;font:450 13.5px/1.4 var(--font-ui);color:var(--ink-2)}
+.today p b{font-weight:650;color:var(--ink-1)}
+.nums{grid-template-columns:repeat(3,minmax(0,1fr))}
+.nums.two{grid-template-columns:1fr 1fr}
+@media (max-width:560px){.nums,.nums.two{grid-template-columns:1fr 1fr}.nums div:nth-child(3){border-left:0;grid-column:1/-1}
+  .nums div:nth-child(n+3){border-top:1px solid var(--line)}}
+.alert{margin:0 0 14px;padding:12px 14px;border:1px solid var(--st-bad);border-left-width:4px;border-radius:10px;
+  background:color-mix(in srgb,var(--st-bad) 12%,transparent);color:var(--ink-1);font-size:14.5px;line-height:1.45}
+.alert p{margin:0}.alert p+p{margin-top:8px}
+.alert b{display:block;font-family:var(--font-head);font-size:13px;letter-spacing:.08em;text-transform:uppercase;color:var(--st-bad)}
+.repay{display:flex;align-items:center;gap:14px;margin:12px 0 0;padding:14px 16px;text-decoration:none;color:inherit;
+  border-radius:var(--r-panel);border:1px solid color-mix(in srgb,var(--signal) 45%,transparent);
+  background:color-mix(in srgb,var(--signal) 9%,var(--panel));transition:transform .15s var(--ease-out)}
+.repay:active{transform:scale(.98)}
+.repay>i{font-size:24px;color:var(--signal-ink)}
+.repay div{flex:1;min-width:0}
+.repay b{display:block;font:700 20px/1 var(--font-head);letter-spacing:.02em;text-transform:uppercase}
+.repay small{display:block;margin-top:5px;font:450 13px/1.35 var(--font-ui);color:var(--ink-2)}
+.repay .go{font-size:18px;color:var(--ink-3)}
+.howto{margin-top:40px;border-top:1px solid var(--line);border-bottom:1px solid var(--line)}
+.howto summary{list-style:none;display:flex;align-items:center;justify-content:space-between;gap:16px;padding:20px 0;cursor:pointer}
+.howto summary::-webkit-details-marker{display:none}
+.howto summary b{display:block;margin-top:7px;font:700 28px/.95 var(--font-head);text-transform:uppercase;letter-spacing:.01em}
+.howto summary i{font-size:22px;color:var(--ink-3);transition:transform .25s var(--ease-out)}
+.howto[open] summary i{transform:rotate(180deg)}
+.howto p{margin:0 0 16px;max-width:62ch;font-size:14px;color:var(--ink-3)}
+@media (prefers-reduced-motion:reduce){.howto summary i{transition:none}}
+</style>
+</head>
+<body>
+<a class="skip" href="#tiles">Skip to trains</a>
+<header class="tt-nav">
+  <div>
+    <a class="tt-mark" href="now.html" aria-label="TrainTimes: your next train">TRAINTIMES</a>
+    <nav aria-label="Main">
+      <a class="nav-live" href="now.html" aria-current="page">Live</a>
+      <a href="map.html">Map</a>
+      <a href="history.html">Delays</a>
+      <a href="fixes.html">Fixes</a>
+      <a class="icon-btn settings-link" href="settings.html" aria-label="Settings" title="Settings">
+        <i class="ph ph-gear-six" aria-hidden="true"></i></a>
+    </nav>
+  </div>
+</header>
+
+<main id="main" class="wrap">
+  <div class="hero">
+  <div class="glow" aria-hidden="true"></div>
+  <div class="rule" aria-hidden="true"></div>
+  <div class="lead">
+    <div class="why" id="why" aria-live="polite"></div>
+    <button type="button" class="edit" id="edit">Change stations</button>
+  </div>
+  <h1 class="route" id="route">Your next train</h1>
+  <div class="strip" id="strip" hidden>
+    <div class="segs" id="segs" role="group"></div>
+    <div class="ends" aria-hidden="true"><span id="strip-first"></span><span id="strip-last"></span></div>
+    <div class="say" id="strip-say" aria-live="polite"></div>
+  </div>
+  <div class="dir" id="dir" hidden>
+    <button type="button" class="chip" data-dir="work" aria-pressed="false">To work</button>
+    <button type="button" class="chip" data-dir="home" aria-pressed="false">To home</button>
+    <span class="updated">
+      <span id="updated"></span>
+      <button type="button" class="icon-btn refresh" id="refresh" aria-label="Refresh trains" title="Refresh">
+        <i class="ph ph-arrow-clockwise" aria-hidden="true"></i></button>
+    </span>
+  </div>
+  </div>
+
+  <section class="setup" id="setup" hidden>
+    <h2>Where are home and work?</h2>
+    <p>Pick your stations. On weekday mornings at home you'll see trains to work; in the
+      afternoon, or near work, trains home. Your location never leaves your phone.</p>
+    <div class="two">
+      <label class="field"><span>Home</span>
+        <input type="text" id="home" aria-label="Home station" placeholder="Station"></label>
+      <label class="field"><span>Work</span>
+        <input type="text" id="work" aria-label="Work station" placeholder="Station"></label>
+      <ul class="picker-list" id="home-list"></ul>
+      <ul class="picker-list" id="work-list"></ul>
+    </div>
+    <div class="row">
+      <button type="button" class="btn primary" id="save">Show my trains</button>
+      <button type="button" class="btn" id="locate"><i class="ph ph-navigation-arrow" aria-hidden="true"></i>
+        Use my location</button>
+    </div>
+  </section>
+
+  <div class="alert" id="alert" role="alert" hidden></div>
+  <ul class="tiles" id="tiles" aria-label="Next trains"></ul>
+  <div class="key" id="key" hidden>
+    <span style="--c:var(--st-ok)">On time</span>
+    <span style="--c:var(--st-late)">Late</span>
+    <span style="--c:var(--st-bad)">10+ min late or cancelled</span>
+    <span style="--c:var(--st-none)">No record yet</span>
+    <span class="pct">% = how often it's been on time lately</span>
+  </div>
+
+  <section class="by-nums" id="by-nums" aria-labelledby="nums-title" hidden>
+    <div class="rule" aria-hidden="true"></div>
+    <p class="kicker" id="nums-kicker"></p>
+    <h2 class="h-section" id="nums-title">Your line today</h2>
+    <div class="today" id="today" hidden></div>
+    <div class="nums" id="nums"></div>
+    <a class="repay" id="repay" hidden></a>
+  </section>
+
+  <details class="howto">
+    <summary><span><span class="kicker">The colours and the %</span><b>How to read this</b></span>
+      <i class="ph ph-caret-down" aria-hidden="true"></i></summary>
+    <p>The bar under each train shows how it's running now: green on time, amber late, red 10+
+      minutes late or cancelled. Before there's news of it, the bar shows how punctual it has been
+      lately (green 90%+ on time, amber 75%+, red less), and grey means no record yet.</p>
+    <p>The percentage is how often it has left within 5 minutes on recent days like today, from
+      TrainTimes' own records. Live running from Network Rail's train movement feed. Times are UK time.</p>
+  </details>
+
+</main>
+
+<footer class="tt-foot">
+  <div>
+    <p>Contains data from Network Rail Infrastructure Ltd, under its open data licence.</p>
+  </div>
+</footer>
+
+<script>
+const STATIC = document.documentElement.dataset.static === "1";
+const $ = id => document.getElementById(id);
+const esc = s => String(s ?? "").replace(/[&<>"]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" })[c]);
+const time = iso => iso ? new Date(iso).toLocaleTimeString("en-GB",
+  { hour: "2-digit", minute: "2-digit", timeZone: "Europe/London" }) : "";
+const REFRESH_MS = 10000;
+const NEAR_KM = 25;                 // this close to a station counts as being there
+const OVERRIDE_MS = 2 * 3600e3;     // a tapped direction sticks this long
+const AT_STATION_KM = 0.5;          // this close: you're at the station (the page focuses on the next train)
+const PRESENCE_MS = 60e3;           // how often to tell the server (so it holds messages about it)
+
+let stations = [], names = new Map(), fullBoards = null;
+// A link can set them: now.html?home=BCS&work=MYB
+const linked = new URLSearchParams(location.search);
+if (linked.get("home") && linked.get("work")) {
+  localStorage.setItem("tt_home", linked.get("home").toUpperCase());
+  localStorage.setItem("tt_work", linked.get("work").toUpperCase());
+}
+// A replay of a past moment: now.html?at=2026-09-29T16:30:00Z (as the board was then).
+const AT = linked.get("at");
+const clockNow = () => AT ? new Date(AT).getTime() : Date.now();
+const atParam = AT ? `&at=${encodeURIComponent(AT)}` : "";
+let home = localStorage.getItem("tt_home"), work = localStorage.getItem("tt_work");
+let here = null, reason = "", timer = null;
+let presence = { station: null, at: 0 };
+
+// ---- Data: the live API, or the published site's JSON files ----
+async function json(url) {
+  const res = await fetch(url, { cache: "no-store" });
+  if (!res.ok) throw new Error(res.status);
+  return res.json();
+}
+async function board(station) {
+  if (!STATIC) return json(`/api/board?station=${station}&to=all&limit=40${atParam}`);
+  const live = await liveJSON(`/api/board?station=${station}&to=all&limit=40${atParam}`);   // live from the server, if up
+  if (live) return live;
+  // No live answer: on a phone with Tailscale on, Chrome won't let this public page call the server's private
+  // address (5 Nov: the page sat on a 20-minute-old copy at Marylebone with the line closed). Opening the
+  // server's own page is allowed, and it's always live; the copy below is only for when that can't happen.
+  const api = document.documentElement.dataset.api;
+  if (api && !AT && !sessionStorage.getItem("tt_live_tried")) {
+    sessionStorage.setItem("tt_live_tried", "1");
+    location.replace(`${api}/now${location.search}`);
+    return new Promise(() => {});              // leaving the page: don't draw the copy meanwhile
+  }
+  fullBoards = fullBoards || json("data/config.json").then(c => new Set(c.full || []));
+  const full = (await fullBoards).has(station);
+  const data = await json(`data/${full ? "" : "all/"}board-${station}.json`);
+  if (data.slim) {
+    for (const d of data.departures) {
+      d.calls_after = (d.calls_after || []).map(([crs, hm]) => {
+        let planned = `${d.planned.slice(0, 11)}${hm}:00+00:00`;
+        if (new Date(planned) < new Date(d.planned)) planned = new Date(new Date(planned).getTime() + 864e5).toISOString();
+        return { crs, planned };
+      });
+    }
+  }
+  return data;
+}
+// How often each train's been on time changes over days, not seconds: kept five minutes rather than
+// asked for again on every 10-second refresh (6 Nov, for phones).
+const oddsKept = new Map();
+function odds(station, to) {
+  const k = `${station}|${to}`, hit = oddsKept.get(k);
+  if (hit && Date.now() - hit[0] < 300e3) return hit[1];
+  const p = fetchOdds(station, to).then(r => { if (!r) oddsKept.delete(k); return r; });
+  oddsKept.set(k, [Date.now(), p]);
+  return p;
+}
+async function fetchOdds(station, to) {
+  try {
+    if (STATIC) {
+      const live = await liveJSON(`/api/punctuality?station=${station}&to=${to}`);
+      if (live) return live;
+      const p = await json(`data/punctuality-${station}.json`);
+      p.route = await json(`data/route-hours-${station}-${to}.json`).then(r => ({ to, ...r })).catch(() => null);
+      return p;
+    }
+    return await json(`/api/punctuality?station=${station}&to=${to}`);
+  } catch (e) { return null; }
+}
+// Tapping a tile opens the map on just that train: its route and the time at every stop.
+// on/off: where you get on and off, for the map's trip panel.
+const trainLink = (d, on = d._from, off = d._to) => (d.train_id || d.route_id)
+  ? `${STATIC ? "map.html" : "/"}?train=${encodeURIComponent(d.train_id || d.route_id)}&only=1&from=live` +
+    (on ? `&on=${on}` : "") + (off ? `&off=${off}` : "") : null;
+
+// ---- Which way: tapped, or where you are, or the time of day ----
+function km(a, b) {
+  const r = Math.PI / 180, dLat = (b.lat - a.lat) * r, dLon = (b.lon - a.lon) * r;
+  const h = Math.sin(dLat / 2) ** 2 + Math.cos(a.lat * r) * Math.cos(b.lat * r) * Math.sin(dLon / 2) ** 2;
+  return 12742 * Math.asin(Math.sqrt(h));
+}
+// Towns with more than one station (Bicester North and Bicester Village): one choice covering them all, each
+// train labelled with its station (3 Nov: Ian, "an option to select Bicester all when there are two stations
+// and then show all trains ... make it clear which train is from which station"). A home or work like "BCS+BIT".
+const GROUP_KM = 5;
+const NOT_TOWNS = /^(London|North|South|East|West|St|New|Upper|Lower|Great|Little|Old|The)$/;
+function stationGroups(list) {
+  const by = new Map();
+  for (const st of list) {
+    const town = st.name.split(/[ (]/)[0];
+    if (!town || NOT_TOWNS.test(town) || st.lat == null || /\bbus(es)?\b/i.test(st.name)) continue;
+    if (!by.has(town)) by.set(town, []);
+    by.get(town).push(st);
+  }
+  const out = [];
+  for (const [town, g] of by) {
+    if (g.length < 2 || g.length > 4 || g.some(a => g.some(b => km(a, b) > GROUP_KM))) continue;
+    out.push({ crs: g.map(st => st.crs).join("+"), name: `${town} (all stations)`, town, group: true,
+               lat: g.reduce((a, st) => a + st.lat, 0) / g.length, lon: g.reduce((a, st) => a + st.lon, 0) / g.length });
+  }
+  return out;
+}
+const members = crs => (crs || "").split("+");
+// "North" for Bicester North in Bicester (all stations)
+function shortName(crs, group) {
+  const g = stations.find(st => st.crs === group);
+  const n = names.get(crs) || crs;
+  return g?.town && n.startsWith(g.town + " ") ? n.slice(g.town.length + 1) : n;
+}
+const STN_COLOURS = ["#2bb3c0", "#c08a2b", "#9a6bd1", "#5aa65a"];
+function stationTag(d) {
+  const [from, to] = [d._group_from, d._group_to];
+  if (!from && !to) return "";
+  const which = from ? members(from).indexOf(d._from) : members(to).indexOf(d._to);
+  const text = from ? shortName(d._from, from) : `to ${shortName(d._to, to)}`;
+  return `<span class="stn" style="--k:${STN_COLOURS[which % STN_COLOURS.length]}">${esc(text)}</span>`;
+}
+function direction() {
+  const tapped = JSON.parse(sessionStorage.getItem("tt_dir") || "null");
+  if (tapped && Date.now() - tapped.at < OVERRIDE_MS) {
+    reason = ["ph-hand-pointing", "Your choice"];
+    return tapped.dir;
+  }
+  const at = crs => stations.find(s => s.crs === crs);
+  if (here && at(home) && at(work)) {
+    const toHome = km(here, at(home)), toWork = km(here, at(work));
+    if (Math.min(toHome, toWork) < NEAR_KM) {
+      const nearWork = toWork < toHome;
+      reason = ["ph-navigation-arrow", `You're near ${names.get(nearWork ? work : home)}`];
+      return nearWork ? "home" : "work";
+    }
+  }
+  const now = new Date();
+  const hour = Number(now.toLocaleString("en-GB", { hour: "2-digit", hour12: false, timeZone: "Europe/London" }));
+  const day = now.toLocaleString("en-GB", { weekday: "long", timeZone: "Europe/London" });
+  const weekend = ["Saturday", "Sunday"].includes(day);
+  const morning = hour >= 3 && hour < 12;
+  reason = ["ph-clock", `${weekend ? day : "Weekday"} ${morning ? "morning" : hour < 17 ? "afternoon" : "evening"}`];
+  return morning ? "work" : "home";
+}
+function setDir(dir) {
+  sessionStorage.setItem("tt_dir", JSON.stringify({ dir, at: Date.now() }));
+  render();
+}
+
+function locate(ask) {
+  if (!navigator.geolocation || !(window.isSecureContext)) {
+    if (ask) alert("Your browser only shares location with secure (https) pages. The published site works; this address doesn't.");
+    return;
+  }
+  navigator.geolocation.getCurrentPosition(p => {
+    here = { lat: p.coords.latitude, lon: p.coords.longitude };
+    localStorage.setItem("tt_geo", "1");
+    render();
+  }, err => { if (ask) alert("Couldn't get your location: " + err.message); },
+  { maximumAge: 5 * 60e3, timeout: 10e3 });
+}
+
+// ---- At the station ----
+// The station you're at (within AT_STATION_KM), or null.
+function atStation() {
+  if (!here) return null;
+  let best = null, dist = Infinity;
+  for (const st of stations) {
+    if (st.lat == null || st.group) continue;
+    const d = km(here, st);
+    if (d < dist) { dist = d; best = st; }
+  }
+  return dist < AT_STATION_KM ? best.crs : null;
+}
+// Tell the server where you are (just the station), so WhatsApp and Telegram
+// stay quiet about its trains while this page shows them; and when you've left.
+function tellServer(station) {
+  const token = localStorage.getItem("tt_token");
+  if (!ACCOUNTS || !token) return false;
+  if (station === presence.station && (!station || Date.now() - presence.at < PRESENCE_MS)) return true;
+  presence = { station, at: Date.now() };
+  accountJSON("/api/presence", { token, station }).catch(() => { presence.at = 0; });
+  return true;
+}
+
+// ---- Drawing ----
+const ukDate = iso => new Date(iso).toLocaleDateString("en-GB", { timeZone: "Europe/London" });
+const tomorrow = iso => ukDate(iso) !== ukDate(new Date().toISOString());
+// The bar along the bottom of a tile is always coloured: how it's running now
+// once there's news of it, and until then how punctual it has been lately
+// (grey only for a train with no record yet).
+// Late bars are always yellow; late text keeps the theme's readable shade.
+const fill = c => c.replace("var(--st-late)", "var(--st-late-fill)");
+function barColour(st, score) {
+  if (st !== "none") return statusColour(st);
+  return colourFor(score) || statusColour("none");
+}
+function colourFor(score) {
+  if (score == null) return null;
+  return score >= 90 ? "var(--st-ok)" : score >= 75 ? "var(--st-late)" : "var(--st-bad)";
+}
+// Not left yet, past its time (5 Nov, Marylebone: the line closed and every train sat there). The server's
+// expected time for these is only "now, still waiting", not a forecast, so it isn't shown as one; a real
+// estimate (e.g. from the late train that forms it) still is.
+const stuck = d => d.state === "overdue";
+const estimate = d => d.expected && !(stuck(d) && new Date(d.expected).getTime() <= clockNow() + 60e3) ? d.expected : null;
+function liveText(d) {
+  if (d.state === "cancelled") return ["Cancelled", "var(--st-bad)"];
+  const late = d.delay_minutes > 0 ? d.delay_minutes : 0;
+  if (stuck(d) && !estimate(d)) return [`Not left yet` + (late ? ` · ${late} min late so far` : ""), late >= VERY_LATE || d.blocked ? "var(--st-bad)" : "var(--st-late)"];
+  if (leaving(d)) return ["Should be leaving now", "var(--ink-3)"];
+  if (d.blocked && !(estimate(d) && late > 1)) return ["Disruption on the line: expect delays", "var(--st-bad)"];
+  if (estimate(d) && time(d.expected) !== time(d.planned))
+    return [`Expected ${time(d.expected)} (${delayLabel(late)})`, late >= 10 ? "var(--st-bad)" : "var(--st-late)"];
+  if ((d.warnings || []).length) return [d.status_text || "Check before you go", "var(--st-late)"];
+  return [d.status_text || "On time", "var(--ink-2)"];
+}
+// Live status, the same colours as Live Status: on time, late, 10+ min late
+// or cancelled, and grey while there's no news of it yet.
+const VERY_LATE = 10;
+function statusOf(d) {
+  if (d.state === "cancelled" || d.blocked) return "bad";
+  if (stuck(d)) return d.delay_minutes >= VERY_LATE ? "bad" : "late";
+  const warned = d.alert || d.state === "not_set_up";
+  if (d.delay_minutes == null) return warned ? "late" : d.state === "ready" ? "ok" : "none";
+  if (d.delay_minutes <= 0) return warned ? "late" : "ok";
+  return d.delay_minutes < VERY_LATE ? "late" : "bad";
+}
+const statusColour = st => `var(--st-${st})`;
+// The small coloured running label by the time: +1 min, −1 min early, On time.
+function delta(d) {
+  if (d.state === "cancelled") return `<span class="delta">Cancelled</span>`;
+  if (stuck(d) && !estimate(d)) return `<span class="delta">Delayed</span>`;
+  if (d.blocked && !(d.delay_minutes > 1)) return `<span class="delta">Disrupted</span>`;
+  if (d.delay_minutes == null) return d.state === "ready" ? `<span class="delta">On time</span>` : "";
+  return `<span class="delta">${esc(delayLabel(d.delay_minutes))}</span>`;
+}
+
+function tile(d, i, score) {
+  const s = d._score !== undefined ? d._score : score?.[time(d.planned)];
+  const c = colourFor(s?.score);
+  const [live] = liveText(d);
+  const st = statusOf(d), liveColour = st === "none" ? "var(--ink-3)" : statusColour(st);
+  const arr = (d.calls_after || []).find(c => c.crs === d._to);
+  const late = d.state !== "cancelled" && d.delay_minutes > 0 ? d.delay_minutes : 0;
+  const arrives = arr ? time(new Date(new Date(arr.planned).getTime() + late * 60e3).toISOString()) : "";
+  const title = s?.score != null
+    ? `On time ${s.on_time} of the last ${s.runs} ${s.runs === 1 ? "run" : "runs"}` +
+      (s.cancelled ? `, cancelled ${s.cancelled}` : "") + (s.worst ? `, worst ${s.worst} min late` : "")
+    : "Not enough days recorded yet to score this train";
+  // How often it's been on time lately (once there's a record), read out in full.
+  const odds = s?.score != null ? `<span class="odds" title="${esc(title)}"><span class="sr-only">On time on </span>${s.score}%<span class="sr-only"> of recent days.</span></span>` : "";
+  // "No news yet" is what the grey bar already says: only the first train spells it out.
+  const said = live && live !== "On time" && (i === 0 || live !== "No news yet") ? live : "";
+  const href = trainLink(d);
+  return `<li${i === 0 ? ' class="wide"' : ""}><${href ? `a href="${href}"` : "div"} class="tile${i === 0 ? " first" : ""}${d.state === "cancelled" ? " cancelled" : ""}"
+      style="${c ? `--c:${c};` : ""}--s:${barColour(st, s?.score)};--b:${fill(barColour(st, s?.score))};--live:${liveColour}">
+    <span class="main">
+      <span class="top"><span class="t">${time(d.planned)}</span>${delta(d)}${whyIcon(d)}</span>
+      ${stationTag(d)}
+      ${said ? `<span class="live">${esc(said)}</span>` : ""}
+    </span>
+    <span class="side">
+      ${i === 0 ? odds : ""}
+      <span class="meta">${tomorrow(d.planned) ? "Tomorrow · " : ""}${arrives ? `<span class="lbl">Arrives</span> <b>${arrives}</b>` : ""}</span>
+      ${i === 0 ? platformHtml(d, "tile-plat") : `<span class="foot">${platformHtml(d, "tile-plat")}${odds}</span>`}
+    </span>
+  </${href ? "a" : "div"}></li>`;
+}
+
+function routeTile(j, i, board) {
+  const live = routeFirstTrain(j, board);
+  const [text] = live ? liveText(live) : ["Planned"];
+  const st = live ? statusOf(live) : "none", colour = st === "none" ? "var(--ink-3)" : statusColour(st);
+  const href = live ? trainLink(live, j.legs[0].from, j.legs[0].to) : null;
+  return `<li${i === 0 ? ' class="wide"' : ""}><${href ? `a href="${href}"` : "div"} class="tile route${i === 0 ? " first" : ""}"
+      style="--s:${statusColour(st)};--b:${fill(statusColour(st))};--live:${colour}">
+    <span class="top"><span class="t">${time(j.departs)}</span>${live ? delta(live) : ""}</span>
+    <span class="live">${esc(text)}</span>
+    <span class="via">${esc(routeSummary(j))}</span>
+    <span class="meta">Arrives ${time(j.arrives)}${live?.platform ? ` · Plat ${esc(live.platform)}` : ""}</span>
+  </${href ? "a" : "div"}></li>`;
+}
+
+// Where it'll leave from, and how sure we are.
+// Past its time with no news (late trains without an expected time aren't assumed gone)
+const leaving = d => d.state !== "cancelled" && !stuck(d) && !d.blocked && !(d.delay_minutes > 0 && !d.expected) &&
+  clockNow() >= new Date(d.expected || d.planned).getTime();
+function platformBig(d) {
+  const booked = d.platform;
+  if (leaving(d)) return ["gone", d.platform_actual || booked || "?", "Should be leaving now"];
+  if (d.set_up || d.platform_actual)
+    return ["sure", d.platform_actual, d.set_up ? "Confirmed: its train is in the platform" : "Confirmed"];
+  if (d.platform_likely)
+    return ["guess", `${d.platform_likely}?`, `Likely: another train will probably form it (booked ${booked || "?"})`];
+  if (d.platform_taken) {
+    const free = d.platform_taken.free || [];
+    return ["watch", booked, `Booked, but another train is in it: watch for a change` + (free.length ? ` (free: ${free.join(", ")})` : "")];
+  }
+  const p = platformInfo(d);
+  if (!p) return ["guess", "?", "Not known yet: it's shown when the train is set up"];
+  return p.kind === "likely" ? ["guess", `${p.platform}?`, "Usually this one lately"] : ["guess", p.platform, "Booked: confirmed when the train is set up"];
+}
+// The train that forms it, in a line.
+function formedText(d) {
+  const f = d.formed_by;
+  if (!f) return "";
+  const what = (f.headcode || "").startsWith("5") ? `The empty train from ${f.origin}` : `The ${f.named} from ${f.origin}`;
+  const state = f.cancelled ? "is cancelled"
+    : f.arrived ? `came in at ${time(f.due)}`
+    : `is due in ${time(f.due)}` + (f.late > 0 ? ` (${f.late} min late)` : "");
+  const usual = f.how === "usual" && f.of ? `; it forms this train on ${f.days} of the last ${f.of} days` : "";
+  return `${what} ${state}${usual}`;
+}
+function stationCard(d, score) {
+  const leaves = new Date(estimate(d) || d.planned), mins = Math.round((leaves - clockNow()) / 60e3);
+  const st = statusOf(d), bar = barColour(st, (d._score !== undefined ? d._score : score?.[time(d.planned)])?.score);
+  const [kind, plat, how] = platformBig(d);
+  const arr = (d.calls_after || []).find(c => c.crs === d._to);
+  const late = d.delay_minutes > 0 ? d.delay_minutes : 0;
+  const arrives = arr ? time(new Date(new Date(arr.planned).getTime() + late * 60e3).toISOString()) : "";
+  const moved = estimate(d) && time(d.expected) !== time(d.planned);
+  // the line's disruption is in the banner above, so not repeated here
+  const notes = (d.warnings || []).filter(w => !/^Platform \d+ has another train/.test(w) && !(d.blocked && w === d.warnings[0])).slice(-2);
+  const href = trainLink(d);
+  return `<li class="wide"><${href ? `a href="${href}"` : "div"} class="tile first station" style="--s:${bar};--b:${fill(bar)}">
+    <span class="eyebrow">Next train to ${esc(names.get(d._to) || d._to)}${d.predicted ? " · projected" : ""}</span>
+    <span class="top"><span class="t">${time(estimate(d) || d.planned)}${moved ? `<s>${time(d.planned)}</s>` : ""}</span>${delta(d)}</span>
+    <span class="count">${stuck(d) && !estimate(d) ? `Delayed: it hasn't left yet` : d.blocked && mins > 0 ? `Due in ${mins} min, but the line's disrupted` : mins <= 0 ? "Due now" : mins < 90 ? `Leaves in ${mins} min` : `Leaves in ${Math.floor(mins / 60)} h ${mins % 60} min`}${arrives ? ` · arrives ${arrives}` : ""}</span>
+    <span class="platbig ${kind}"><span class="k">Platform</span><b>${esc(plat)}</b><span class="how">${esc(how)}</span></span>
+    ${formedText(d) ? `<span class="reason">${esc(formedText(d))}</span>` : ""}
+    ${notes.length ? `<ul class="notes">${notes.map(n => `<li>${esc(n)}</li>`).join("")}</ul>` : ""}
+  </${href ? "a" : "div"}></li>`;
+}
+
+// The strip under the route: one segment per hour trains run, coloured by how
+// late they've got there on average on the last few days like today. Tap one
+// for its numbers.
+const stripColour = r => !r ? "var(--line)"
+  : r.cancelled >= 0.1 || (r.delay ?? 0) >= 5 ? "var(--st-bad)"
+  : (r.delay ?? 0) >= 2 || r.cancelled > 0 ? "var(--st-late)" : "var(--st-ok)";
+function drawStrip(p, from, to) {
+  const route = p?.route, rows = route?.hourly || [];
+  $("strip").hidden = !rows.length;
+  if (!rows.length) return;
+  const nowHour = Number(new Date().toLocaleString("en-GB", { hour: "2-digit", hour12: false, timeZone: "Europe/London" }));
+  const first = Math.min(...rows.map(r => r.hour)), last = Math.max(...rows.map(r => r.hour));
+  const by = new Map(rows.map(r => [r.hour, r]));
+  const hours = Array.from({ length: last - first + 1 }, (_, n) => first + n);
+  const n = route.days.length, kind = { weekday: "weekday", saturday: "Saturday", sunday: "Sunday" }[p.day_type] || "day";
+  const over = n === 1 ? `last ${kind}` : `last ${n} ${kind}s`;
+  const said = h => {
+    const r = by.get(h), when = `${String(h).padStart(2, "0")}:00–${String((h + 1) % 24).padStart(2, "0")}:00`;
+    if (!r) return `${when}: no trains`;
+    const late = r.delay == null ? "no times recorded" : r.delay < 1 ? "on time on average" : `${Math.round(r.delay)} min late on average`;
+    return `${when} · ${late}` + (r.cancelled ? `, ${Math.round(100 * r.cancelled)}% cancelled` : "") + ` · ${over}`;
+  };
+  $("segs").setAttribute("aria-label", `How late trains to ${names.get(to) || to} have been, by hour`);
+  $("segs").innerHTML = hours.map(h => `<button type="button" data-h="${h}" class="${h === nowHour ? "now" : ""}"
+    style="--c:${stripColour(by.get(h))}" aria-label="${esc(said(h))}" aria-pressed="false"></button>`).join("");
+  $("strip-first").textContent = `${String(first).padStart(2, "0")}:00`;
+  $("strip-last").textContent = `${String(last + 1).padStart(2, "0")}:00`;
+  const show = h => {
+    $("segs").querySelectorAll("button").forEach(b => b.setAttribute("aria-pressed", String(+b.dataset.h === h)));
+    $("strip-say").textContent = said(h);
+  };
+  $("segs").querySelectorAll("button").forEach(b => b.onclick = () => show(+b.dataset.h));
+  if (!$("strip-say").textContent || $("strip-say").dataset.for !== `${from}-${to}`) {
+    $("strip-say").dataset.for = `${from}-${to}`;
+    show(by.has(nowHour) ? nowHour : first);
+  }
+}
+
+// Your line today, under the trains. Three questions a commuter actually has:
+//   how has the line been today (every train to work and home, coloured by how late it got in),
+//   which of the coming trains is the best bet, and what's left: the fastest and the last one;
+//   and, when a train this week was late enough, that there's Delay Repay to claim.
+// Today's running and the timetable come from the server; on the published copy they're
+// left out when it's not reachable.
+const api = path => STATIC ? liveJSON(path) : json(path).catch(() => null);
+const kept = new Map();       // path -> [fetched at, promise]: delays every 2 min, the timetable hourly
+function keptAPI(path, ms) {
+  const k = kept.get(path);
+  if (k && Date.now() - k[0] < ms) return k[1];
+  const p = api(path).then(r => { if (!r) kept.delete(path); return r; });
+  kept.set(path, [Date.now(), p]);
+  return p;
+}
+const mins = hm => +hm.slice(0, 2) * 60 + +hm.slice(3, 5);
+const dur = m => m >= 100 ? `${Math.floor(m / 60)} h ${String(m % 60).padStart(2, "0")}` : `${m} min`;
+const lateColour = t => t.cancelled ? "var(--st-bad)" : t.arrival_delay == null ? "var(--line-strong)"
+  : t.arrival_delay >= 10 ? "var(--st-bad)" : t.arrival_delay >= 5 ? "var(--st-late-fill)" : "var(--st-ok)";
+
+function legToday(leg, today) {
+  const trips = (leg.trips || []).filter(t => ukDate(t.planned_departure) === today)
+    .sort((a, b) => new Date(a.planned_departure) - new Date(b.planned_departure));
+  if (!trips.length) return "";
+  const done = trips.filter(t => t.cancelled || t.arrival_delay != null);
+  const late = done.filter(t => t.cancelled || t.arrival_delay >= 5);
+  const cx = done.filter(t => t.cancelled).length;
+  const worst = done.filter(t => !t.cancelled).sort((a, b) => b.arrival_delay - a.arrival_delay)[0];
+  const say = !done.length ? "None in yet."
+    : !late.length ? `<b>All ${done.length} on time</b> (within 5 min).`
+    : `<b>${late.length} of ${done.length} late</b>` + (cx ? `, ${cx} cancelled` : "") +
+      (worst?.arrival_delay >= 5 ? `. Worst: the ${time(worst.planned_departure)}, ${worst.arrival_delay} min late in.` : ".");
+  const sq = trips.map(t => {
+    const run = !t.cancelled && t.arrival_delay == null;
+    const what = t.cancelled ? "cancelled" : run ? "still running" : t.arrival_delay <= 0 ? "on time" : `${t.arrival_delay} min late`;
+    return `<li class="${t.cancelled ? "x" : run ? "run" : ""}" style="--c:${lateColour(t)}" title="${time(t.planned_departure)}: ${what}"
+      aria-label="${time(t.planned_departure)}, ${what}">${t.cancelled ? "×" : ""}</li>`;
+  }).join("");
+  const name = leg.label === "to_work" ? "To work" : "To home";
+  return `<div class="leg"><span>${name} · ${esc(leg.from_name)} to ${esc(leg.to_name)}</span><ul class="form">${sq}</ul><p>${say}</p></div>`;
+}
+
+async function drawNums(trains, scores, p, from, to) {
+  const f = members(from)[0], t = members(to)[0], h = members(home)[0], w = members(work)[0];
+  $("nums-kicker").textContent = `${names.get(from) || from} to ${names.get(to) || to}`;
+  const now = clockNow(), today = ukDate(new Date(now).toISOString());
+  const nowHM = new Date(now).toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit", hour12: false, timeZone: "Europe/London" });
+  const [delays, tt] = await Promise.all([
+    keptAPI(`/api/delays?home=${h}&work=${w}`, 120e3),
+    keptAPI(`/api/times?from=${f}&to=${t}`, 3600e3)]);
+
+  // Today: both directions, in the order you'd travel them
+  const legs = (delays?.legs || []).map(l => legToday(l, today)).filter(Boolean);
+  $("today").innerHTML = legs.join("");
+  $("today").hidden = !legs.length;
+
+  // Best bet: of the coming trains, the one that has run on time most often; the sooner if it's a tie
+  const cells = [];
+  const arrOf = d => (d.calls_after || []).find(c => c.crs === d._to);
+  const scored = trains.filter(d => d.state !== "cancelled" && !d.blocked && !stuck(d))
+    .map(d => ({ d, s: (d._score !== undefined ? d._score : scores?.[time(d.planned)])?.score }))
+    .filter(x => x.s != null);
+  const best = scored.sort((a, b) => b.s - a.s)[0];
+  if (best) {
+    const a = arrOf(best.d), m = a ? Math.round((new Date(a.planned) - new Date(best.d.planned)) / 60e3) : null;
+    cells.push(["Best bet", time(best.d.planned), `${best.s}% on time lately` + (m ? ` · ${dur(m)}` : ""), colourFor(best.s)]);
+  }
+  // What's left today from the timetable: services after midnight belong to tonight
+  const wd = (new Date(now).getUTCDay() + 6) % 7;     // Monday 0; UK and UTC agree on the day bar the small hours
+  const left = (tt?.times || []).map(x => {
+    const small = mins(x.time) < 180;
+    const runs = x.runs?.[small ? (wd + 1) % 7 : wd] && x.runs[small ? (wd + 1) % 7 : wd] !== "-";
+    const at = mins(x.time) + (small ? 1440 : 0), arr = mins(x.arrives) + (mins(x.arrives) < mins(x.time) || small ? 1440 : 0);
+    return runs && at > mins(nowHM) + (mins(nowHM) < 180 ? 1440 : 0) ? { ...x, at, m: arr - at } : null;
+  }).filter(Boolean).sort((a, b) => a.at - b.at);
+  if (left.length) {
+    // the quickest of the next 3 hours: the 00:01 being 7 minutes faster helps no one at 6 pm
+    const soon = left.filter(x => x.at <= left[0].at + 180).sort((a, b) => a.m - b.m || a.at - b.at)[0];
+    if (soon) cells.push(["Fastest soon", soon.time, `${dur(soon.m)} · arrives ${soon.arrives}`, null]);
+    const last = [...left].sort((a, b) => b.at - a.at)[0];
+    cells.push(["Last train", last.time, `arrives ${last.arrives}` + (last.at >= 1440 ? " · after midnight" : ""), null]);
+  }
+  $("nums").className = `nums${cells.length === 2 ? " two" : ""}`;
+  $("nums").innerHTML = cells.map(([k, v, n, c]) =>
+    `<div${c ? ` style="--v:${c}"` : ""}><span>${k}</span><b>${esc(v)}</b><small>${esc(n)}</small></div>`).join("");
+  $("nums").hidden = !cells.length;
+
+  // Delay Repay: trains this week late enough to claim for
+  const claims = (delays?.claimable || []).filter(c => !c.claim_by || c.claim_by >= today.split("/").reverse().join("-"));
+  if (claims.length) {
+    const c = claims[0], d = ukDate(c.planned_departure) === today ? "today" : new Date(c.planned_departure)
+      .toLocaleDateString("en-GB", { weekday: "short", day: "numeric", month: "short", timeZone: "Europe/London" });
+    $("repay").href = STATIC ? "history.html" : "/history";
+    $("repay").innerHTML = `<i class="ph ph-coins" aria-hidden="true"></i><div>
+      <b>${claims.length === 1 ? "1 train" : `${claims.length} trains`} to claim for</b>
+      <small>Delay Repay: the ${time(c.planned_departure)} ${esc(c.from)} ${d}, ${c.cancelled ? "cancelled" : `${c.arrival_delay} min late`}` +
+      `${c.compensation ? `, ${esc(c.compensation)} back` : ""}${claims.length > 1 ? ` and ${claims.length - 1} more` : ""}</small></div>
+      <i class="ph ph-caret-right go" aria-hidden="true"></i>`;
+  }
+  $("repay").hidden = !claims.length;
+  $("by-nums").hidden = !trains.length && !legs.length && !cells.length;
+}
+
+// ---- Where the car is ----
+// Which of home's stations you drove to this morning, so the way home goes back to it (Ian, 3 Nov: Bicester
+// Village that morning, not North). From the server for your account (netwatch on the home Mac works it out
+// from where the phone caught the train; only the station code comes back), or else from this phone
+// having seen you at one of home's stations this morning.
+const townOf = crs => !crs ? crs : crs.includes("+") ? crs
+  : stations.find(s => s.group && members(s.crs).includes(crs))?.crs || crs;
+const ukDay = () => new Date(clockNow()).toLocaleDateString("en-CA", { timeZone: "Europe/London" });   // 2026-11-03
+const carKept = { at: 0 };
+async function carToday() {
+  const token = localStorage.getItem("tt_token");
+  if (token && ACCOUNTS && Date.now() - carKept.at > 300e3) {
+    carKept.at = Date.now();
+    const path = `/api/parked?token=${encodeURIComponent(token)}`;
+    const r = await (STATIC ? liveJSON(path) : json(path).catch(() => null));
+    if (r?.station) try { localStorage.setItem("tt_car", JSON.stringify(r)); } catch (e) {}
+  }
+  let v = null;
+  try { v = JSON.parse(localStorage.getItem("tt_car") || "null"); } catch (e) {}
+  return v?.day === ukDay() ? v : null;
+}
+function noteCar(dir) {
+  const at = atStation();
+  if (dir !== "work" || !at || townOf(at) !== townOf(home)) return;
+  const hm = new Date(clockNow()).toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit", timeZone: "Europe/London" });
+  if (+hm.slice(0, 2) >= 12) return;
+  try {
+    const v = JSON.parse(localStorage.getItem("tt_car") || "null");
+    if (v?.day !== ukDay() || v.station !== at) localStorage.setItem("tt_car", JSON.stringify({ station: at, day: ukDay(), since: hm }));
+  } catch (e) {}
+}
+
+// While the home/work stations are being changed, nothing redraws: the 10-second refresh, coming back
+// to the tab and location updates all used to close the boxes and throw away what was typed.
+let editing = false;
+async function render() {
+  clearTimeout(timer);
+  if (editing) return;
+  if (document.hidden && !AT) return;     // coming back to the page redraws (visibilitychange)
+  if (!home || !work) return showSetup();
+  $("setup").hidden = true;
+  $("dir").hidden = $("updated").parentElement.hidden = false;
+  $("edit").hidden = false;
+  $("refresh").classList.add("busy");
+  const dir = direction();
+  let [from, to] = dir === "work" ? [home, work] : [work, home];
+  noteCar(dir);
+  // Going home: to the station the car's at, when it's one of home's (Bicester North or Village)
+  const car = dir === "home" ? await carToday() : null;
+  if (editing) return;
+  const carHere = car && townOf(car.station) === townOf(to) ? car.station : null;
+  if (carHere) to = carHere;
+  document.querySelectorAll("#dir [data-dir]").forEach(b => b.setAttribute("aria-pressed", String(b.dataset.dir === dir)));
+  $("why").innerHTML = carHere
+    ? `<i class="ph ph-car-simple" aria-hidden="true"></i>Your car's at ${esc(names.get(carHere) || carHere)} · home`
+    : `<i class="ph ${reason[0]}" aria-hidden="true"></i>${esc(reason[1])} · ${dir === "work" ? "to work" : "home"}`;
+  $("route").innerHTML = `${esc(names.get(from) || from)}<em><span class="to">to </span>${esc(names.get(to) || to)}</em>`;
+  document.title = `${names.get(from) || from} to ${names.get(to) || to} | TrainTimes`;
+  try {
+    // A town's stations (BCS+BIT): every station's board, in time order, each train knowing its station
+    const froms = members(from), tos = members(to);
+    odds(froms[0], tos[0]);                               // asked for alongside the boards, not after
+    const boards = await Promise.all(froms.map(board));
+    if (editing) return;                                  // Edit was pressed while this refresh was loading
+    const data = { departures: boards.flatMap((b, k) => (b.departures || []).map(d => ({ ...d, _from: froms[k] })))
+                     .sort((a, b) => new Date(a.planned) - new Date(b.planned)),
+                   generated_at: boards.map(b => b.generated_at).filter(Boolean).sort()[0] };
+    const now = clockNow();
+    const trains = data.departures
+      .map(d => ({ ...d, _to: (d.calls_after || []).find(c => tos.includes(c.crs))?.crs }))
+      .filter(d => d._to)
+      .filter(d => d.state !== "departed")
+      // stuck trains stay until they go (the server drops them after an hour)
+      .filter(d => d.state === "cancelled" || stuck(d) || new Date(d.expected || d.planned).getTime() > now - 30e3)
+      .slice(0, 7)
+      .map(d => ({ ...d, _group_from: froms.length > 1 ? from : null, _group_to: tos.length > 1 ? to : null }));
+    showAlert(trains, data);
+    // how often each has been on time, per station pair
+    const pairs = [...new Set([`${froms[0]}|${tos[0]}`, ...trains.map(d => `${d._from}|${d._to}`)])];
+    const got = await Promise.all(pairs.map(k => odds(...k.split("|"))));
+    const byPair = new Map(pairs.map((k, n) => [k, got[n]]));
+    const p = byPair.get(`${froms[0]}|${tos[0]}`) || got.find(Boolean);
+    if (froms.length > 1 || tos.length > 1)
+      trains.forEach(d => { d._score = byPair.get(`${d._from}|${d._to}`)?.trains?.[time(d.planned)] ?? null; });
+    const scores = p?.trains || null;
+    // At the station you're leaving from: just the next train you can catch
+    // (projected time and platform), then the ones after it.
+    const at = atStation();
+    const atFrom = froms.includes(at);
+    const paused = !AT && tellServer(atFrom ? at : null);
+    drawStrip(p, from, to);
+    if (atFrom && trains.some(d => d._from === at)) {
+      if (froms.length > 1) trains.splice(0, trains.length, ...trains.filter(d => d._from === at));   // the one you're at
+      const next = trains.findIndex(d => d.state !== "cancelled");
+      const gone = trains.slice(0, Math.max(next, 0)).filter(d => d.state === "cancelled");
+      $("why").innerHTML = `<i class="ph ph-map-pin" aria-hidden="true"></i>You're at ${esc(names.get(at) || at)}` +
+        (paused ? " · messages paused while you're here" : "");
+      $("tiles").innerHTML = next < 0 ? trains.map((d, i) => tile(d, i, scores)).join("")
+        : gone.map(d => `<li class="gone">The ${time(d.planned)} is cancelled</li>`).join("") +
+          stationCard(trains[next], scores) + trains.slice(next + 1, next + 4).map((d, i) => tile(d, i + 1, scores)).join("");
+      $("key").hidden = true;
+      $("by-nums").hidden = true;
+      showUpdated(data);
+      $("refresh").classList.remove("busy");
+      if (!AT) timer = setTimeout(render, REFRESH_MS);
+      return;
+    }
+    // Nothing direct: the fastest ways with a change.
+    const routes = trains.length ? [] : await findRoutes(froms[0], tos[0]);
+    $("tiles").innerHTML = trains.length ? trains.map((d, i) => tile(d, i, scores)).join("")
+      : routes.length ? routes.slice(0, 5).map((j, i) => routeTile(j, i, data.departures || [])).join("")
+      : `<li class="empty">No more trains from ${esc(names.get(from) || from)} to ${esc(names.get(to) || to)} in the next few hours.</li>`;
+    $("key").hidden = !trains.length;
+    drawNums(trains, scores, p, from, to).catch(e => console.warn("line today", e));
+    showUpdated(data);
+    drawStrip(p, from, to);
+  } catch (e) {
+    $("tiles").innerHTML = `<li class="empty">Couldn't load trains just now. Retrying…</li>`;
+  }
+  $("refresh").classList.remove("busy");
+  if (!AT) timer = setTimeout(render, REFRESH_MS);
+}
+
+// The line's trouble, above the trains (5 Nov: the server knew the line through Wembley Stadium had stopped,
+// and the page showed every train on time).
+function showAlert(trains, data) {
+  const lines = [...new Set(trains.filter(d => d.blocked && d.state !== "cancelled").map(d => d.warnings?.[0]).filter(Boolean))];
+  const stuckN = trains.filter(stuck).length;
+  const say = [];
+  if (lines.length) say.push(`<b>Disruption</b> ${lines.map(esc).join(" · ")}`);
+  else if (stuckN >= 2) say.push(`<b>Delays</b> ${stuckN} trains haven't left on time. Check before you go.`);
+  $("alert").innerHTML = say.map(t => `<p>${t}</p>`).join("");
+  $("alert").hidden = !say.length;
+}
+function showUpdated(data) {
+  $("updated").textContent = data.generated_at ? `Updated ${time(data.generated_at)}` : "";
+}
+
+// ---- Setting home and work ----
+let homePicker, workPicker;
+function showSetup() {
+  editing = true;
+  $("strip").hidden = true;
+  $("setup").hidden = false;
+  $("dir").hidden = $("updated").parentElement.hidden = true;
+  $("edit").hidden = true;
+  $("why").textContent = "";
+  $("route").textContent = "Your next train";
+  $("tiles").innerHTML = "";
+  $("key").hidden = $("by-nums").hidden = $("alert").hidden = true;
+  homePicker.set(home);
+  workPicker.set(work);
+}
+$("save").onclick = () => {
+  home = homePicker.value; work = workPicker.value;
+  if (!home || !work || home === work) return alert("Pick two different stations.");
+  editing = false;
+  localStorage.setItem("tt_home", home);
+  localStorage.setItem("tt_work", work);
+  sessionStorage.removeItem("tt_dir");
+  render();
+};
+$("edit").onclick = () => { editing = true; clearTimeout(timer); showSetup(); };
+$("locate").onclick = () => locate(true);
+$("refresh").onclick = () => { if (localStorage.getItem("tt_geo")) locate(false); render(); };
+document.querySelectorAll("#dir [data-dir]").forEach(b => b.onclick = () => setDir(b.dataset.dir));
+document.addEventListener("visibilitychange", () => {
+  if (document.visibilityState === "visible") { if (localStorage.getItem("tt_geo")) locate(false); render(); }
+});
+
+(async () => {
+  // The station list (220 KB) is kept on the phone: the trains are drawn from the last one straight
+  // away, and a fresh list is fetched behind them for next time (6 Nov).
+  const freshStations = (STATIC ? json("data/stations.json") : json("/api/stations"))
+    .then(d => { const list = (d.stations || []).filter(s => s.crs);
+                 try { localStorage.setItem("tt_stations", JSON.stringify(list)); } catch (e) {}
+                 return list; });
+  let keptStations = null;
+  try { keptStations = JSON.parse(localStorage.getItem("tt_stations") || "null"); } catch (e) {}
+  stations = keptStations?.length ? keptStations : await freshStations;
+  freshStations.catch(() => {});
+  // each town's "all stations" choice just before its first station in the list
+  const groups = stationGroups(stations);
+  stations = stations.flatMap(st => [...groups.filter(g => members(g.crs)[0] === st.crs), st]);
+  names = new Map(stations.map(s => [s.crs, s.name]));
+  homePicker = stationPicker($("home"), $("home-list"), { stations: () => stations, onPick: () => {} });
+  workPicker = stationPicker($("work"), $("work-list"), { stations: () => stations, onPick: () => {} });
+  // Signed in on the live server: start from your account's commute.
+  const token = localStorage.getItem("tt_token");
+  if (ACCOUNTS && token && !(home && work)) {
+    try {
+      const sub = (await accountJSON(`/api/account?token=${encodeURIComponent(token)}`)).subscription || {};
+      const toWork = (sub.journeys || []).find(j => j.label === "to_work");
+      const toHome = (sub.journeys || []).find(j => j.label === "to_home");
+      home = home || toWork?.from || toHome?.to || null;
+      work = work || toWork?.to || toHome?.from || null;
+      if (home && work) { localStorage.setItem("tt_home", home); localStorage.setItem("tt_work", work); }
+    } catch (e) { /* not signed in */ }
+  }
+  if (localStorage.getItem("tt_geo")) {
+    locate(false);
+    // Keep up as you walk in to the station (the page redraws every few seconds).
+    if (navigator.geolocation && window.isSecureContext)
+      navigator.geolocation.watchPosition(p => { here = { lat: p.coords.latitude, lon: p.coords.longitude }; },
+        () => {}, { maximumAge: 60e3, timeout: 20e3 });
+  }
+  render();
+})();
+</script>
+</body>
+</html>

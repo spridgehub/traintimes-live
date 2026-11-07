@@ -1,0 +1,1 @@
+{"station": "BBS", "day_type": "saturday", "days_counted": 2, "trains": {"14:08": {"runs": 2, "on_time": 2, "late": 0, "cancelled": 0, "average": 0.0, "worst": 0, "score": null, "dest": "KID"}}, "hourly": [{"hour": 14, "trains": 2, "late": 0.0, "cancelled": 0.0}]}
