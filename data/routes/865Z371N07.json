@@ -1,1 +1,1 @@
-{"train_id":"865Z371N07","points":[[51.29669,-0.75544],[51.29669,-0.75544]],"calls":[],"origin":"Farnborough (Main)","destination":"Farnborough (Main)","operator":"South Western Railway","operator_code":"SW","delay_minutes":null,"where":null,"cancelled":false,"terminated":false}
+{"train_id":"865Z371N07","points":[[51.29669,-0.75544],[51.29669,-0.75544]],"calls":[],"origin":"Farnborough (Main)","destination":"Farnborough (Main)","operator":"South Western Railway","operator_code":"SW","delay_minutes":0,"where":"Left Farnborough (Main)","cancelled":false,"terminated":false}
