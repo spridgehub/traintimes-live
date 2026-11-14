@@ -603,6 +603,22 @@ function tile(d, i, score) {
   </${href ? "a" : "div"}></li>`;
 }
 
+// Leaving from a big group (London, 14 terminals): only the stations with direct trains to where you're going get
+// their board fetched (14 Nov: all 13 London boards took over a minute; only Marylebone has trains to Bicester).
+// The planner says which (~40 ms each), kept an hour. Small groups (a town's two stations) are all fetched.
+const servesKept = new Map();
+async function servingFrom(froms, tos) {
+  if (froms.length <= 4) return froms;
+  const k = froms.join("+") + ">" + tos.join("+"), hit = servesKept.get(k);
+  if (hit && Date.now() - hit[0] < 3600e3) return hit[1];
+  const ok = await Promise.all(froms.map(f => Promise.all(tos.slice(0, 4).map(t => f === t ? [] : findRoutes(f, t)))
+    .then(lists => lists.flat().some(j => j.changes === 0)).catch(() => false)));
+  const list = froms.filter((f, i) => ok[i]);
+  const use = list.length ? list : froms.slice(0, 1);
+  servesKept.set(k, [Date.now(), use]);
+  return use;
+}
+
 // Journeys with a change to each destination in a group that no direct train shown reaches, best few by arrival.
 // Each is asked for at most every 2 minutes (the planner, ~40 ms each).
 const routesKept = new Map();
@@ -617,7 +633,12 @@ async function otherRoutes(from, tos, trains) {
     return p;
   }));
   const soon = Date.now() + 3 * 3600e3, seen = new Set();
-  return lists.flat().filter(j => new Date(j.departs) <= soon && new Date(j.departs) > clockNow() - 60e3)
+  // only sensible ones: no slower than half as long again as the quickest direct train, or the quickest of these
+  const directMins = trains.map(d => d.arrives?.planned && (new Date(d.arrives.planned) - new Date(d.planned)) / 60e3).filter(Boolean);
+  const all = lists.flat();
+  const best = Math.min(...directMins, ...all.map(j => j.minutes));
+  return all.filter(j => j.minutes <= best * 1.5)
+    .filter(j => new Date(j.departs) <= soon && new Date(j.departs) > clockNow() - 60e3)
     .sort((a, b) => new Date(a.arrives) - new Date(b.arrives))
     .filter(j => { const k = j.legs.map(l => l.departs + l.to).join(); return !seen.has(k) && seen.add(k); })
     .slice(0, 4);
@@ -893,9 +914,10 @@ async function render() {
   document.title = `${names.get(from) || from} to ${names.get(to) || to} | TrainTimes`;
   try {
     // A town's stations (BCS+BIT): every station's board, in time order, each train knowing its station
-    const froms = members(from), tos = members(to);
+    const tos = members(to);
     odds(main(from), main(to));                           // asked for alongside the boards, not after
-    const boards = await Promise.all(froms.map(board));
+    const froms = await servingFrom(members(from), tos);
+    const boards = await Promise.all(froms.map(st => board(st).catch(() => ({ departures: [] }))));
     if (editing) return;                                  // Edit was pressed while this refresh was loading
     const data = { departures: boards.flatMap((b, k) => (b.departures || []).map(d => ({ ...d, _from: froms[k] })))
                      .sort((a, b) => new Date(a.planned) - new Date(b.planned)),
