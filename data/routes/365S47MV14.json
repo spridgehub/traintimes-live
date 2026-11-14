@@ -1,1 +1,1 @@
-{"train_id":"365S47MV14","points":[[53.4046,-2.97917],[53.4046,-2.97917]],"calls":[],"origin":"Liverpool Central","destination":"Liverpool Central","operator":"Merseyrail","operator_code":"ME","delay_minutes":null,"where":null,"cancelled":false,"terminated":false}
+{"train_id":"365S47MV14","points":[[53.4046,-2.97917],[53.4046,-2.97917]],"calls":[],"origin":"Liverpool Central","destination":"Liverpool Central","operator":"Merseyrail","operator_code":"ME","delay_minutes":1,"where":"Left Liverpool Central","cancelled":false,"terminated":false}
