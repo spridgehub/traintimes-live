@@ -102,10 +102,13 @@
 .strip .ends{display:flex;justify-content:space-between;margin-top:5px;font:500 10.5px/1 var(--font-num);color:var(--ink-4)}
 .strip .say{min-height:15px;margin-top:5px;font:500 12px/1.25 var(--font-ui);color:var(--ink-3)}
 
+.tiles li.others{grid-column:1/-1;font:600 12px/1.3 var(--font-ui);letter-spacing:.06em;text-transform:uppercase;
+  color:var(--ink-3);margin:10px 0 -4px;list-style:none}
 .setup{margin-top:22px;padding:16px;background:var(--panel);border:1px solid var(--line);border-radius:var(--r-panel)}
 .setup h2{font-size:17px;font-weight:650}
 .setup p{margin:6px 0 0;font-size:13.5px;color:var(--ink-3)}
-.setup .two{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:14px;position:relative}
+.setup .two{display:grid;grid-template-columns:1fr auto 1fr;gap:10px;margin-top:14px;position:relative;align-items:end}
+.setup .swap{height:42px;width:42px;margin-bottom:0}
 .setup .two .picker-list{grid-column:1/-1}
 .setup input{height:42px;font-size:15px}
 .setup .row{display:flex;gap:8px;margin-top:14px;flex-wrap:wrap}
@@ -238,8 +241,8 @@
     <div class="say" id="strip-say" aria-live="polite"></div>
   </div>
   <div class="dir" id="dir" hidden>
-    <button type="button" class="chip" data-dir="work" aria-pressed="false">To work</button>
-    <button type="button" class="chip" data-dir="home" aria-pressed="false">To home</button>
+    <button type="button" class="chip" data-dir="work" aria-pressed="false">Outward</button>
+    <button type="button" class="chip" data-dir="home" aria-pressed="false">Return</button>
     <span class="updated">
       <span id="updated"></span>
       <button type="button" class="icon-btn refresh" id="refresh" aria-label="Refresh trains" title="Refresh">
@@ -249,19 +252,21 @@
   </div>
 
   <section class="setup" id="setup" hidden>
-    <h2>Where are home and work?</h2>
-    <p>Pick your stations. On weekday mornings at home you'll see trains to work; in the
-      afternoon, or near work, trains home. Your location never leaves your phone.</p>
+    <h2>Where are you going?</h2>
+    <p>Pick where you're leaving from and where you're going: the trains show as soon as both are set. "London (all
+      stations)" covers every London terminal. Use ⇄ to swap, or the buttons above the trains to go back the other way.</p>
     <div class="two">
-      <label class="field"><span>Home</span>
-        <input type="text" id="home" aria-label="Home station" placeholder="Station"></label>
-      <label class="field"><span>Work</span>
-        <input type="text" id="work" aria-label="Work station" placeholder="Station"></label>
+      <label class="field"><span>From</span>
+        <input type="text" id="home" aria-label="Departure station" placeholder="Station"></label>
+      <button type="button" class="icon-btn swap" id="swap" aria-label="Swap from and to" title="Swap">
+        <i class="ph ph-arrows-left-right" aria-hidden="true"></i></button>
+      <label class="field"><span>To</span>
+        <input type="text" id="work" aria-label="Arrival station" placeholder="Station"></label>
       <ul class="picker-list" id="home-list"></ul>
       <ul class="picker-list" id="work-list"></ul>
     </div>
     <div class="row">
-      <button type="button" class="btn primary" id="save">Show my trains</button>
+      <button type="button" class="btn primary" id="save">Show trains</button>
       <button type="button" class="btn" id="locate"><i class="ph ph-navigation-arrow" aria-hidden="true"></i>
         Use my location</button>
     </div>
@@ -392,6 +397,9 @@ const trainLink = (d, on = d._from, off = d._to) => (d.train_id || d.route_id)
   ? `${STATIC ? "map.html" : "/"}?train=${encodeURIComponent(d.train_id || d.route_id)}&only=1&from=live` +
     (on ? `&on=${on}` : "") + (off ? `&off=${off}` : "") : null;
 
+// "Bicester" for Bicester (all stations), "London" for London (all stations), else the station's name
+const short = crs => { const n = names.get(crs) || crs; return n.replace(/ \(all stations\)$/, ""); };
+
 // ---- Which way: tapped, or where you are, or the time of day ----
 function km(a, b) {
   const r = Math.PI / 180, dLat = (b.lat - a.lat) * r, dLon = (b.lon - a.lon) * r;
@@ -419,7 +427,19 @@ function stationGroups(list) {
   }
   return out;
 }
+// London (all stations) (14 Nov, Ian: "if just want to go to London we should have London all and show all available
+// routes"): every London terminal, as one choice. Direct trains to any of them, and journeys with a change to the rest.
+const LONDON = ["MYB", "PAD", "EUS", "KGX", "STP", "LST", "LBG", "VIC", "WAT", "CHX", "CST", "FST", "MOG", "BFR"];
+function londonGroup(list) {
+  const have = LONDON.filter(c => list.some(st => st.crs === c));
+  if (have.length < 2) return null;
+  return { crs: have.join("+"), name: "London (all stations)", town: "London", group: true, london: true,
+           lat: 51.5074, lon: -0.1278 };
+}
 const members = crs => (crs || "").split("+");
+// The member a group is mostly reached at (the one most of the trains shown go to), for the odds and the numbers.
+const primary = new Map();
+const main = crs => primary.get(crs) || members(crs)[0];
 // "North" for Bicester North in Bicester (all stations)
 function shortName(crs, group) {
   const g = stations.find(st => st.crs === group);
@@ -583,6 +603,26 @@ function tile(d, i, score) {
   </${href ? "a" : "div"}></li>`;
 }
 
+// Journeys with a change to each destination in a group that no direct train shown reaches, best few by arrival.
+// Each is asked for at most every 2 minutes (the planner, ~40 ms each).
+const routesKept = new Map();
+async function otherRoutes(from, tos, trains) {
+  const direct = new Set(trains.map(d => d._to));
+  const ask = tos.filter(t => !direct.has(t) && t !== from);
+  const lists = await Promise.all(ask.map(t => {
+    const k = `${from}|${t}`, hit = routesKept.get(k);
+    if (hit && Date.now() - hit[0] < 120e3) return hit[1];
+    const p = findRoutes(from, t).then(r => r.filter(j => j.changes > 0)).catch(() => []);
+    routesKept.set(k, [Date.now(), p]);
+    return p;
+  }));
+  const soon = Date.now() + 3 * 3600e3, seen = new Set();
+  return lists.flat().filter(j => new Date(j.departs) <= soon && new Date(j.departs) > clockNow() - 60e3)
+    .sort((a, b) => new Date(a.arrives) - new Date(b.arrives))
+    .filter(j => { const k = j.legs.map(l => l.departs + l.to).join(); return !seen.has(k) && seen.add(k); })
+    .slice(0, 4);
+}
+
 function routeTile(j, i, board) {
   const live = routeFirstTrain(j, board);
   const [text] = live ? liveText(live) : ["Planned"];
@@ -729,7 +769,7 @@ function legToday(leg, today) {
 }
 
 async function drawNums(trains, scores, p, from, to) {
-  const f = members(from)[0], t = members(to)[0], h = members(home)[0], w = members(work)[0];
+  const f = main(from), t = main(to), h = main(home), w = main(work);
   $("nums-kicker").textContent = `${names.get(from) || from} to ${names.get(to) || to}`;
   const now = clockNow(), today = ukDate(new Date(now).toISOString());
   const nowHM = new Date(now).toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit", hour12: false, timeZone: "Europe/London" });
@@ -841,16 +881,20 @@ async function render() {
   if (editing) return;
   const carHere = car && townOf(car.station) === townOf(to) ? car.station : null;
   if (carHere) to = carHere;
-  document.querySelectorAll("#dir [data-dir]").forEach(b => b.setAttribute("aria-pressed", String(b.dataset.dir === dir)));
+  document.querySelectorAll("#dir [data-dir]").forEach(b => {
+    b.setAttribute("aria-pressed", String(b.dataset.dir === dir));
+    const [a, z] = b.dataset.dir === "work" ? [home, work] : [work, home];
+    b.textContent = `${short(a)} → ${short(z)}`;
+  });
   $("why").innerHTML = carHere
     ? `<i class="ph ph-car-simple" aria-hidden="true"></i>Your car's at ${esc(names.get(carHere) || carHere)} · home`
-    : `<i class="ph ${reason[0]}" aria-hidden="true"></i>${esc(reason[1])} · ${dir === "work" ? "to work" : "home"}`;
+    : `<i class="ph ${reason[0]}" aria-hidden="true"></i>${esc(reason[1])}`;
   $("route").innerHTML = `${esc(names.get(from) || from)}<em><span class="to">to </span>${esc(names.get(to) || to)}</em>`;
   document.title = `${names.get(from) || from} to ${names.get(to) || to} | TrainTimes`;
   try {
     // A town's stations (BCS+BIT): every station's board, in time order, each train knowing its station
     const froms = members(from), tos = members(to);
-    odds(froms[0], tos[0]);                               // asked for alongside the boards, not after
+    odds(main(from), main(to));                           // asked for alongside the boards, not after
     const boards = await Promise.all(froms.map(board));
     if (editing) return;                                  // Edit was pressed while this refresh was loading
     const data = { departures: boards.flatMap((b, k) => (b.departures || []).map(d => ({ ...d, _from: froms[k] })))
@@ -865,12 +909,19 @@ async function render() {
       .filter(d => d.state === "cancelled" || stuck(d) || new Date(d.expected || d.planned).getTime() > now - 30e3)
       .slice(0, 7)
       .map(d => ({ ...d, _group_from: froms.length > 1 ? from : null, _group_to: tos.length > 1 ? to : null }));
+    for (const [g, key] of [[from, "_from"], [to, "_to"]]) {        // a group's main station: where most trains go
+      if (!g.includes("+")) continue;
+      const n = new Map();
+      trains.forEach(d => n.set(d[key], (n.get(d[key]) || 0) + 1));
+      const best = [...n].sort((a, b) => b[1] - a[1])[0];
+      if (best) primary.set(g, best[0]);
+    }
     showAlert(trains, data);
     // how often each has been on time, per station pair
-    const pairs = [...new Set([`${froms[0]}|${tos[0]}`, ...trains.map(d => `${d._from}|${d._to}`)])];
+    const pairs = [...new Set([`${main(from)}|${main(to)}`, ...trains.map(d => `${d._from}|${d._to}`)])];
     const got = await Promise.all(pairs.map(k => odds(...k.split("|"))));
     const byPair = new Map(pairs.map((k, n) => [k, got[n]]));
-    const p = byPair.get(`${froms[0]}|${tos[0]}`) || got.find(Boolean);
+    const p = byPair.get(`${main(from)}|${main(to)}`) || got.find(Boolean);
     if (froms.length > 1 || tos.length > 1)
       trains.forEach(d => { d._score = byPair.get(`${d._from}|${d._to}`)?.trains?.[time(d.planned)] ?? null; });
     const scores = p?.trains || null;
@@ -897,10 +948,15 @@ async function render() {
       return;
     }
     // Nothing direct: the fastest ways with a change.
-    const routes = trains.length ? [] : await findRoutes(froms[0], tos[0]);
-    $("tiles").innerHTML = trains.length ? trains.map((d, i) => tile(d, i, scores)).join("")
+    const routes = trains.length ? [] : await findRoutes(main(from), main(to));
+    // A group of destinations (London): the other ways in too, with a change, to the ones no direct train goes to
+    const others = tos.length > 1 ? await otherRoutes(main(from), tos, trains) : [];
+    if (editing) return;
+    $("tiles").innerHTML = (trains.length ? trains.map((d, i) => tile(d, i, scores)).join("")
       : routes.length ? routes.slice(0, 5).map((j, i) => routeTile(j, i, data.departures || [])).join("")
-      : `<li class="empty">No more trains from ${esc(names.get(from) || from)} to ${esc(names.get(to) || to)} in the next few hours.</li>`;
+      : others.length ? "" : `<li class="empty">No more trains from ${esc(names.get(from) || from)} to ${esc(names.get(to) || to)} in the next few hours.</li>`)
+      + (others.length ? `<li class="others">Other ways to ${esc(names.get(to) || to)}, with a change</li>` +
+         others.map((j, i) => routeTile(j, trains.length || routes.length ? i + 1 : i, data.departures || [])).join("") : "");
     $("key").hidden = !trains.length;
     drawNums(trains, scores, p, from, to).catch(e => console.warn("line today", e));
     showUpdated(data);
@@ -942,14 +998,27 @@ function showSetup() {
   homePicker.set(home);
   workPicker.set(work);
 }
-$("save").onclick = () => {
-  home = homePicker.value; work = workPicker.value;
-  if (!home || !work || home === work) return alert("Pick two different stations.");
+// Choosing is all it takes (14 Nov, Ian: "changing the train stations works seamlessly ... we simply want to choose
+// departure and arrival point"): both set and different, and the trains show, From -> To, whatever the time of day.
+function apply(quiet) {
+  const a = homePicker.value, b = workPicker.value;
+  if (!a || !b || a === b) {
+    if (!quiet) alert("Pick two different stations.");
+    return;
+  }
+  home = a; work = b;
   editing = false;
   localStorage.setItem("tt_home", home);
   localStorage.setItem("tt_work", work);
-  sessionStorage.removeItem("tt_dir");
+  primary.clear();
+  sessionStorage.setItem("tt_dir", JSON.stringify({ dir: "work", at: Date.now() }));   // what you chose wins
   render();
+}
+$("save").onclick = () => apply(false);
+$("swap").onclick = () => {
+  const a = homePicker.value, b = workPicker.value;
+  homePicker.set(b); workPicker.set(a);
+  apply(true);
 };
 $("edit").onclick = () => { editing = true; clearTimeout(timer); showSetup(); };
 $("locate").onclick = () => locate(true);
@@ -972,10 +1041,13 @@ document.addEventListener("visibilitychange", () => {
   freshStations.catch(() => {});
   // each town's "all stations" choice just before its first station in the list
   const groups = stationGroups(stations);
-  stations = stations.flatMap(st => [...groups.filter(g => members(g.crs)[0] === st.crs), st]);
+  const london = londonGroup(stations);
+  const firstLondon = stations.find(st => /^London /.test(st.name))?.crs;
+  stations = stations.flatMap(st => [...(london && st.crs === firstLondon ? [london] : []),
+                                     ...groups.filter(g => members(g.crs)[0] === st.crs), st]);
   names = new Map(stations.map(s => [s.crs, s.name]));
-  homePicker = stationPicker($("home"), $("home-list"), { stations: () => stations, onPick: () => {} });
-  workPicker = stationPicker($("work"), $("work-list"), { stations: () => stations, onPick: () => {} });
+  homePicker = stationPicker($("home"), $("home-list"), { stations: () => stations, onPick: () => apply(true) });
+  workPicker = stationPicker($("work"), $("work-list"), { stations: () => stations, onPick: () => apply(true) });
   // Signed in on the live server: start from your account's commute.
   const token = localStorage.getItem("tt_token");
   if (ACCOUNTS && token && !(home && work)) {
