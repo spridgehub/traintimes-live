@@ -1,1 +1,1 @@
-{"train_id":"623Z731L28","points":[[52.13619,-0.47944],[52.13619,-0.47944]],"calls":[],"origin":"Bedford","destination":"Bedford","operator":"LNER","operator_code":"GR","delay_minutes":null,"where":null,"cancelled":false,"terminated":false}
+{"train_id":"623Z731L28","points":[[52.13619,-0.47944],[52.13619,-0.47944]],"calls":[],"origin":"Bedford","destination":"Bedford","operator":"LNER","operator_code":"GR","delay_minutes":0,"where":"Left Bedford","cancelled":false,"terminated":false}
